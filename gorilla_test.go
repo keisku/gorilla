@@ -14,12 +14,12 @@ import (
 )
 
 func Test_Encode_Decode(t *testing.T) {
-	t0 := uint32(time.Now().Unix())
+	header := uint32(time.Now().Unix())
 
 	const dataLen = 50000
 	valueFuzz := fuzz.New().NilChance(0)
 	data := make([]*gorilla.Data, dataLen)
-	ts := t0
+	ts := header
 	for i := 0; i < dataLen; i++ {
 		ts += uint32(rand.Int31n(10000))
 		var v float64
@@ -31,7 +31,7 @@ func Test_Encode_Decode(t *testing.T) {
 
 	// Encode
 	e := gorilla.NewEncoder(buf)
-	e.PutHeader(t0)
+	e.PutHeader(header)
 	for _, d := range data {
 		require.Nil(t, e.Encode(*d))
 	}
@@ -42,7 +42,7 @@ func Test_Encode_Decode(t *testing.T) {
 	h, err := d.LoadHeader()
 
 	require.Nil(t, err)
-	assert.Equal(t, t0, h)
+	assert.Equal(t, header, h)
 	var inputData []*gorilla.Data
 	for {
 		in := &gorilla.Data{}
