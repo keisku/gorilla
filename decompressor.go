@@ -7,9 +7,9 @@ import (
 	"math"
 )
 
-// Decoder is a Facebook's paper based encoder.
+// Compressor decompresses time-series data based on Facebook's paper.
 // Link to the paper: https://www.vldb.org/pvldb/vol8/p1816-teller.pdf
-type Decoder struct {
+type Decompressor struct {
 	br            *bitReader
 	header        uint32
 	t             uint32
@@ -19,81 +19,91 @@ type Decoder struct {
 	value         uint64
 }
 
-func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{
+// NewDecompressor initializes Decompressor and returns decompressed header.
+func NewDecompressor(r io.Reader) (d *Decompressor, header uint32, err error) {
+	d = &Decompressor{
 		br: newBitReader(r),
 	}
-}
-
-// LoadHeader loads the starting timestamp.
-func (d *Decoder) LoadHeader() (header uint32, err error) {
-	t, err := d.br.readBits(32)
+	h, err := d.br.readBits(32)
 	if err != nil {
-		return 0, fmt.Errorf("failed to decode header: %w", err)
+		return nil, 0, fmt.Errorf("failed to decode header: %w", err)
 	}
-	d.header = uint32(t)
-	return d.header, nil
+	d.header = uint32(h)
+	return d, d.header, nil
 }
 
-// Decode read and decode data, then bind it to an argument.
-func (d *Decoder) Decode(data *Data) error {
-	var err error
-	var read *Data
-	if d.t == 0 {
-		read, err = d.readFirst()
-		if err != nil {
-			return err
-		}
+// Iter returns an iterator of decompressor.
+func (d *Decompressor) Iter() *DecompressorIter {
+	return &DecompressorIter{0, 0, nil, d}
+}
+
+// DecompressorIter is an iterator of Decompressor.
+type DecompressorIter struct {
+	t   uint32
+	v   float64
+	err error
+	d   *Decompressor
+}
+
+// Get returns decompressed time-series data.
+func (d *DecompressorIter) Get() (t uint32, v float64) {
+	return d.t, d.v
+}
+
+// Err returns error during decompression.
+func (d *DecompressorIter) Err() error {
+	if d.err == io.EOF {
+		return nil
+	}
+	return d.err
+}
+
+// Next proceeds decompressing time-series data unitil EOF.
+func (d *DecompressorIter) Next() bool {
+	if d.d.t == 0 {
+		d.t, d.v, d.err = d.d.decompressFirst()
 	} else {
-		read, err = d.read()
-		if err != nil {
-			return err
-		}
+		d.t, d.v, d.err = d.d.decompress()
 	}
-	data.UnixTimestamp = read.UnixTimestamp
-	data.Value = read.Value
-	return nil
+	return d.err == nil
 }
 
-func (d *Decoder) readFirst() (*Data, error) {
+func (d *Decompressor) decompressFirst() (t uint32, v float64, err error) {
 	delta, err := d.br.readBits(firstDeltaBits)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read first sample: %w", err)
+		return 0, 0, fmt.Errorf("failed to decompress delta at first: %w", err)
 	}
 	if delta == 1<<firstDeltaBits-1 {
-		return nil, io.EOF
+		return 0, 0, io.EOF
 	}
 
 	value, err := d.br.readBits(64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read first sample value: %w", err)
+		return 0, 0, fmt.Errorf("failed to decompress value at first: %w", err)
 	}
 
 	d.delta = uint32(delta)
 	d.t = d.header + d.delta
 	d.value = value
 
-	return &Data{
-		UnixTimestamp: d.t,
-		Value:         math.Float64frombits(d.value),
-	}, nil
+	return d.t, math.Float64frombits(d.value), nil
 }
 
-func (d *Decoder) read() (*Data, error) {
-	t, err := d.readTimestamp()
+func (d *Decompressor) decompress() (t uint32, v float64, err error) {
+	t, err = d.decompressTimestamp()
 	if err != nil {
-		return nil, err
+		return 0, 0, fmt.Errorf("failed to decompress timestamp: %w", err)
 	}
 
-	v, err := d.readValue()
+	v, err = d.decompressValue()
 	if err != nil {
-		return nil, err
+		return 0, 0, fmt.Errorf("failed to decompress value: %w", err)
 	}
 
-	return &Data{t, v}, nil
+	return t, v, nil
 }
 
-func (d *Decoder) readTimestamp() (uint32, error) {
+func (d *Decompressor) decompressTimestamp() (uint32, error) {
 	n, err := d.dodBitsN()
 	if err != nil {
 		return 0, err
@@ -123,7 +133,7 @@ func (d *Decoder) readTimestamp() (uint32, error) {
 	return d.t, nil
 }
 
-func (d *Decoder) readValue() (float64, error) {
+func (d *Decompressor) decompressValue() (float64, error) {
 	bit, err := d.br.readBit()
 	if err != nil {
 		return 0, fmt.Errorf("failed to read value: %w", err)
@@ -162,7 +172,7 @@ func (d *Decoder) readValue() (float64, error) {
 }
 
 // read delta of delta
-func (d *Decoder) dodBitsN() (n uint, err error) {
+func (d *Decompressor) dodBitsN() (n uint, err error) {
 	var dod byte
 	for i := 0; i < 4; i++ {
 		dod <<= 1

@@ -10,9 +10,9 @@ const (
 	firstDeltaBits = 14
 )
 
-// Encoder is a Facebook's paper based encoder.
+// Compressor compresses time-series data based on Facebook's paper.
 // Link to the paper: https://www.vldb.org/pvldb/vol8/p1816-teller.pdf
-type Encoder struct {
+type Compressor struct {
 	bw            *bitWriter
 	header        uint32
 	t             uint32
@@ -22,55 +22,50 @@ type Encoder struct {
 	value         uint64
 }
 
-// NewEncoder initializes a Facebook Gorilla based encoder.
-func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{
+// NewCompressor initialize Compressor and returns a function to be invoked
+// at the end of compressing.
+func NewCompressor(w io.Writer, header uint32) (c *Compressor, finish func() error, err error) {
+	c = &Compressor{
+		header:       header,
 		bw:           newBitWriter(w),
 		leadingZeros: math.MaxUint8,
 	}
-}
-
-// PutHeader puts the starting timestamp.
-func (e *Encoder) PutHeader(h uint32) error {
-	if err := e.bw.writeBits(uint64(h), 32); err != nil {
-		return fmt.Errorf("failed to write header: %w", err)
+	if err := c.bw.writeBits(uint64(header), 32); err != nil {
+		return nil, nil, fmt.Errorf("failed to write header: %w", err)
 	}
-	e.header = h
-	return nil
+	return c, c.finish, nil
 }
 
-// Encode encode and write data.
-func (e *Encoder) Encode(data Data) error {
+// Compress compresses time-series data and write.
+func (e *Compressor) Compress(t uint32, v float64) error {
 	if e.t == 0 {
-		return e.writeFirst(data)
+		delta := t - e.header
+		e.t = t
+		e.tDelta = delta
+		e.value = math.Float64bits(v)
+
+		if err := e.bw.writeBits(uint64(delta), firstDeltaBits); err != nil {
+			return fmt.Errorf("failed to write first timestamp: %w", err)
+		}
+		if err := e.bw.writeBits(e.value, 64); err != nil {
+			return fmt.Errorf("failed to write first value: %w", err)
+		}
+		return nil
 	}
-	return e.write(data)
+	return e.compress(t, v)
 }
 
-func (e *Encoder) writeFirst(data Data) error {
-	delta := data.UnixTimestamp - e.header
-	e.t = data.UnixTimestamp
-	e.tDelta = delta
-	e.value = math.Float64bits(data.Value)
-
-	if err := e.bw.writeBits(uint64(delta), firstDeltaBits); err != nil {
-		return fmt.Errorf("failed to write first delta: %w", err)
+func (e *Compressor) compress(t uint32, v float64) error {
+	if err := e.compressTimestamp(t); err != nil {
+		return fmt.Errorf("failed to compress timestamp: %w", err)
 	}
-	return e.bw.writeBits(e.value, 64)
-}
-
-func (e *Encoder) write(data Data) error {
-	if err := e.writeTimestamp(data.UnixTimestamp); err != nil {
-		return fmt.Errorf("failed to write time series data: %w", err)
-	}
-	if err := e.writeValue(data.Value); err != nil {
-		return fmt.Errorf("failed to write time series data: %w", err)
+	if err := e.compressValue(v); err != nil {
+		return fmt.Errorf("failed to compress value: %w", err)
 	}
 	return nil
 }
 
-// Compressing time stamps
-func (e *Encoder) writeTimestamp(t uint32) error {
+func (e *Compressor) compressTimestamp(t uint32) error {
 	// If t < e.t, delta is overflowed because it is uint32.
 	// And it causes unexpected EOF during decoding.
 	delta := t - e.t
@@ -141,7 +136,7 @@ func writeInt64Bits(bw *bitWriter, i int64, nbits uint) error {
 	return bw.writeBits(u, int(nbits))
 }
 
-func (e *Encoder) writeValue(v float64) error {
+func (e *Compressor) compressValue(v float64) error {
 	value := math.Float64bits(v)
 	xor := e.value ^ value
 	e.value = value
@@ -154,7 +149,7 @@ func (e *Encoder) writeValue(v float64) error {
 	trailingZeros := trailingZeros(xor)
 
 	if err := e.bw.writeBit(one); err != nil {
-		return fmt.Errorf("failed to write one: %w", err)
+		return fmt.Errorf("failed to write one bit: %w", err)
 	}
 
 	if e.leadingZeros <= leadingZeros && e.trailingZeros <= trailingZeros {
@@ -162,7 +157,7 @@ func (e *Encoder) writeValue(v float64) error {
 		// i.e., there are at least as many leading zeros and as many trailing zeros as with the previous value
 		// use that information for the block position and just store the meaningful XORed value.
 		if err := e.bw.writeBit(zero); err != nil {
-			return fmt.Errorf("failed to write zero: %w", err)
+			return fmt.Errorf("failed to write zero bit: %w", err)
 		}
 		significantBits := int(64 - e.leadingZeros - e.trailingZeros)
 		if err := e.bw.writeBits(xor>>e.trailingZeros, significantBits); err != nil {
@@ -176,7 +171,7 @@ func (e *Encoder) writeValue(v float64) error {
 
 	// write new leading
 	if err := e.bw.writeBit(one); err != nil {
-		return fmt.Errorf("failed to write one: %w", err)
+		return fmt.Errorf("failed to write one bit: %w", err)
 	}
 	if err := e.bw.writeBits(uint64(leadingZeros), 5); err != nil {
 		return fmt.Errorf("failed to write leading zeros: %w", err)
@@ -188,7 +183,7 @@ func (e *Encoder) writeValue(v float64) error {
 	// So instead we write out a 0 and adjust it back to 64 on unpacking.
 	significantBits := 64 - leadingZeros - trailingZeros
 	if err := e.bw.writeBits(uint64(significantBits), 6); err != nil {
-		return fmt.Errorf("failed to write bits: %w", err)
+		return fmt.Errorf("failed to write significant bits: %w", err)
 	}
 	if err := e.bw.writeBits(xor>>e.trailingZeros, int(significantBits)); err != nil {
 		return fmt.Errorf("failed to write xor value")
@@ -214,8 +209,8 @@ func trailingZeros(v uint64) uint8 {
 	return ret
 }
 
-// Flush encodes the finish marker and flush bits with zero bits padding for byte-align.
-func (e *Encoder) Flush() error {
+// finish compresses the finish marker and flush bits with zero bits padding for byte-align.
+func (e *Compressor) finish() error {
 	if e.t == 0 {
 		// Add finish marker with delta = 0x3FFF (firstDeltaBits = 14 bits), and first value = 0
 		err := e.bw.writeBits(1<<firstDeltaBits-1, firstDeltaBits)

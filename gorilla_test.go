@@ -2,7 +2,6 @@ package gorilla_test
 
 import (
 	"bytes"
-	"io"
 	"math/rand"
 	"testing"
 	"time"
@@ -13,45 +12,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_Encode_Decode(t *testing.T) {
+func Test_Compress_Decompress(t *testing.T) {
+	type Data struct {
+		t uint32
+		v float64
+	}
 	header := uint32(time.Now().Unix())
 
 	const dataLen = 50000
 	valueFuzz := fuzz.New().NilChance(0)
-	data := make([]*gorilla.Data, dataLen)
+	data := make([]*Data, dataLen)
 	ts := header
 	for i := 0; i < dataLen; i++ {
 		ts += uint32(rand.Int31n(10000))
 		var v float64
 		valueFuzz.Fuzz(&v)
-		data[i] = &gorilla.Data{ts, v}
+		data[i] = &Data{ts, v}
 	}
 
 	buf := new(bytes.Buffer)
 
-	// Encode
-	e := gorilla.NewEncoder(buf)
-	e.PutHeader(header)
+	// Compression
+	c, finish, err := gorilla.NewCompressor(buf, header)
+	require.Nil(t, err)
 	for _, d := range data {
-		require.Nil(t, e.Encode(*d))
+		require.Nil(t, c.Compress(d.t, d.v))
 	}
-	require.Nil(t, e.Flush())
+	require.Nil(t, finish())
 
-	// Decode
-	d := gorilla.NewDecoder(buf)
-	h, err := d.LoadHeader()
-
+	// Decompression
+	var actual []*Data
+	d, h, err := gorilla.NewDecompressor(buf)
 	require.Nil(t, err)
 	assert.Equal(t, header, h)
-	var inputData []*gorilla.Data
-	for {
-		in := &gorilla.Data{}
-		err := d.Decode(in)
-		if err == io.EOF {
-			break
-		}
-		require.Nil(t, err)
-		inputData = append(inputData, in)
+	iter := d.Iter()
+	for iter.Next() {
+		t, v := iter.Get()
+		actual = append(actual, &Data{t, v})
 	}
-	assert.Equal(t, data, inputData)
+	require.Nil(t, iter.Err())
+	assert.Equal(t, data, actual)
 }

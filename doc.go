@@ -1,2 +1,2 @@
-// Gorilla provides an encoder/decoder package based on Facebook's Gorilla.
+// Gorilla provides a compressor/decompressor package based on Facebook's Gorilla.
 package gorilla
