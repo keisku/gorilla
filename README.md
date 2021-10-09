@@ -48,10 +48,10 @@ if err != nil {
     return err
 }
 
-if err := e.Compress(uint32(time.Now().Unix()), 10.0); err != nil {
+if err := c.Compress(uint32(time.Now().Unix()), 10.0); err != nil {
     return err
 }
-if err := e.Compress(uint32(time.Now().Unix()), 10.5); err != nil {
+if err := c.Compress(uint32(time.Now().Unix()), 10.5); err != nil {
     return err
 }
 
