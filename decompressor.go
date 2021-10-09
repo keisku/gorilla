@@ -52,7 +52,7 @@ func (d *DecompressorIter) Get() (t uint32, v float64) {
 
 // Err returns error during decompression.
 func (d *DecompressorIter) Err() error {
-	if d.err == io.EOF {
+	if errors.Is(d.err, io.EOF) {
 		return nil
 	}
 	return d.err
