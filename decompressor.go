@@ -171,7 +171,6 @@ func (d *Decompressor) decompressValue() (float64, error) {
 	return math.Float64frombits(d.value), nil
 }
 
-// read delta of delta
 func (d *Decompressor) dodBitsN() (n uint, err error) {
 	var dod byte
 	for i := 0; i < 4; i++ {

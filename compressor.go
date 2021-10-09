@@ -38,6 +38,7 @@ func NewCompressor(w io.Writer, header uint32) (c *Compressor, finish func() err
 
 // Compress compresses time-series data and write.
 func (e *Compressor) Compress(t uint32, v float64) error {
+	// First time to compress.
 	if e.t == 0 {
 		delta := t - e.header
 		e.t = t
@@ -47,6 +48,7 @@ func (e *Compressor) Compress(t uint32, v float64) error {
 		if err := e.bw.writeBits(uint64(delta), firstDeltaBits); err != nil {
 			return fmt.Errorf("failed to write first timestamp: %w", err)
 		}
+		// The first value is stored with no compression.
 		if err := e.bw.writeBits(e.value, 64); err != nil {
 			return fmt.Errorf("failed to write first value: %w", err)
 		}
@@ -141,6 +143,7 @@ func (e *Compressor) compressValue(v float64) error {
 	xor := e.value ^ value
 	e.value = value
 
+	// Value is the same as previous.
 	if xor == 0 {
 		return e.bw.writeBit(zero)
 	}
@@ -152,10 +155,10 @@ func (e *Compressor) compressValue(v float64) error {
 		return fmt.Errorf("failed to write one bit: %w", err)
 	}
 
+	// If the block of meaningful bits falls within the block of previous meaningful bits,
+	// i.e., there are at least as many leading zeros and as many trailing zeros as with the previous value
+	// use that information for the block position and just store the meaningful XORed value.
 	if e.leadingZeros <= leadingZeros && e.trailingZeros <= trailingZeros {
-		// If the block of meaningful bits falls within the block of previous meaningful bits,
-		// i.e., there are at least as many leading zeros and as many trailing zeros as with the previous value
-		// use that information for the block position and just store the meaningful XORed value.
 		if err := e.bw.writeBit(zero); err != nil {
 			return fmt.Errorf("failed to write zero bit: %w", err)
 		}
@@ -169,7 +172,6 @@ func (e *Compressor) compressValue(v float64) error {
 	e.leadingZeros = leadingZeros
 	e.trailingZeros = trailingZeros
 
-	// write new leading
 	if err := e.bw.writeBit(one); err != nil {
 		return fmt.Errorf("failed to write one bit: %w", err)
 	}
@@ -179,7 +181,7 @@ func (e *Compressor) compressValue(v float64) error {
 	// Note that if leading == trailing == 0, then sigbits == 64.
 	// But that value doesn't actually fit into the 6 bits we have.
 	// Luckily, we never need to encode 0 significant bits,
-	// since that would put us in the other case (vdelta == 0).
+	// since that would put us in the other case (vDelta == 0).
 	// So instead we write out a 0 and adjust it back to 64 on unpacking.
 	significantBits := 64 - leadingZeros - trailingZeros
 	if err := e.bw.writeBits(uint64(significantBits), 6); err != nil {
