@@ -104,7 +104,7 @@ func (d *Decompressor) decompress() (t uint32, v float64, err error) {
 }
 
 func (d *Decompressor) decompressTimestamp() (uint32, error) {
-	n, err := d.dodBitsN()
+	n, err := d.dodTimestampBitN()
 	if err != nil {
 		return 0, err
 	}
@@ -131,6 +131,38 @@ func (d *Decompressor) decompressTimestamp() (uint32, error) {
 	d.delta += uint32(dod)
 	d.t += d.delta
 	return d.t, nil
+}
+
+// returning the amount of delta-of-delta timestamp bits.
+func (d *Decompressor) dodTimestampBitN() (n uint, err error) {
+	var dod byte
+	for i := 0; i < 4; i++ {
+		dod <<= 1
+		b, err := d.br.readBit()
+		if err != nil {
+			return 0, err
+		}
+		if b {
+			dod |= 1
+		} else {
+			break
+		}
+	}
+
+	switch dod {
+	case 0x00: // 0
+		return 0, nil
+	case 0x02: // 10
+		return 7, nil
+	case 0x06: // 110
+		return 9, nil
+	case 0x0E: // 1110
+		return 12, nil
+	case 0x0F: // 1111
+		return 32, nil
+	default:
+		return 0, errors.New("invalid bit header for bit length to read")
+	}
 }
 
 func (d *Decompressor) decompressValue() (float64, error) {
@@ -169,35 +201,4 @@ func (d *Decompressor) decompressValue() (float64, error) {
 	}
 
 	return math.Float64frombits(d.value), nil
-}
-
-func (d *Decompressor) dodBitsN() (n uint, err error) {
-	var dod byte
-	for i := 0; i < 4; i++ {
-		dod <<= 1
-		b, err := d.br.readBit()
-		if err != nil {
-			return 0, err
-		}
-		if b {
-			dod |= 1
-		} else {
-			break
-		}
-	}
-
-	switch dod {
-	case 0x00: // 0
-		return 0, nil
-	case 0x02: // 10
-		return 7, nil
-	case 0x06: // 110
-		return 9, nil
-	case 0x0E: // 1110
-		return 12, nil
-	case 0x0F: // 1111
-		return 32, nil
-	default:
-		return 0, errors.New("invalid bit header for bit length to read")
-	}
 }
