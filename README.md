@@ -68,6 +68,8 @@ if err != nil {
     return err
 }
 
+fmt.Printf("header: %v\n", h)
+
 iter := d.Iter()
 for iter.Next() {
     t, v := iter.Get()
