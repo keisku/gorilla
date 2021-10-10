@@ -75,7 +75,7 @@ func (c *Compressor) compressTimestamp(t uint32) error {
 	c.t = t
 	c.tDelta = delta
 
-	// | DoD         | header bits | Value bits | Total bits |
+	// | DoD         | Header bits | Value bits | Total bits |
 	// |-------------|-------------|------------|------------|
 	// | 0           | 0           | 0          | 1          |
 	// | -63, 64     | 10          | 7          | 9          |
