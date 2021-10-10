@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
-	"time"
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
@@ -57,60 +56,31 @@ func Test_bitWriter_writeBit(t *testing.T) {
 }
 
 func Test_bitWriter_writeBits(t *testing.T) {
-	var (
-		unix = time.Now().Unix()
-	)
-	type args struct {
-		u     uint64
-		nbits int
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "write timestamp",
-			args: args{
-				u:     uint64(unix),
-				nbits: 64,
-			},
-		},
-		{
-			name: "write 630",
-			args: args{
-				u:     630,
-				nbits: 64,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf := new(bytes.Buffer)
-			bw := newBitWriter(buf)
+	f := fuzz.New().NilChance(0)
 
-			err := bw.writeBits(tt.args.u, tt.args.nbits)
-			require.Nil(t, err)
+	for i := 0; i < 10; i++ {
+		var u64 uint64
+		f.Fuzz(&u64)
 
-			wantBytesLen := tt.args.nbits / 8
-			wantBytes := make([]byte, wantBytesLen)
-			binary.BigEndian.PutUint64(wantBytes, tt.args.u)
+		buf := new(bytes.Buffer)
+		bw := newBitWriter(buf)
+		require.Nil(t, bw.writeBits(u64, 64))
 
-			assert.Equal(t, wantBytesLen, buf.Len())
-			assert.Equal(t, wantBytes, buf.Bytes())
-		})
+		wantBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(wantBytes, u64)
+
+		assert.Equal(t, wantBytes, buf.Bytes())
 	}
 }
 
 func Test_bitWriter_writeByte(t *testing.T) {
-	f := fuzz.New().NilChance(0)
-	for i := 0; i < 100; i++ {
-		var b byte
-		f.Fuzz(&b)
+	var b byte = 0x1
+	for i := 0; i < 256; i++ {
 		buf := new(bytes.Buffer)
+		require.Nil(t, buf.WriteByte(b))
 		bw := newBitWriter(buf)
-		err := bw.writeByte(b)
-		require.Nil(t, err)
-		assert.Equal(t, 1, buf.Len())
+		require.Nil(t, bw.writeByte(b))
 		assert.Equal(t, b, buf.Bytes()[0])
+		b++
 	}
 }
