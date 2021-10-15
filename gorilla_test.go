@@ -45,9 +45,9 @@ func Test_Compress_Decompress(t *testing.T) {
 	d, h, err := gorilla.NewDecompressor(buf)
 	require.Nil(t, err)
 	assert.Equal(t, header, h)
-	iter := d.Iter()
-	for iter.Next() {
-		t, v := iter.Get()
+	iter := d.Iterator()
+	for iter.HasNext() {
+		t, v := iter.Next()
 		actual = append(actual, data{t, v})
 	}
 	require.Nil(t, iter.Err())

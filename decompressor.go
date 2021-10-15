@@ -32,40 +32,40 @@ func NewDecompressor(r io.Reader) (d *Decompressor, header uint32, err error) {
 	return d, d.header, nil
 }
 
-// Iter returns an iterator of decompressor.
-func (d *Decompressor) Iter() *DecompressorIter {
-	return &DecompressorIter{0, 0, nil, d}
+// Iterator returns an iterator of decompressor.
+func (d *Decompressor) Iterator() *DecompressIterator {
+	return &DecompressIterator{0, 0, nil, d}
 }
 
-// DecompressorIter is an iterator of Decompressor.
-type DecompressorIter struct {
+// DecompressIterator is an iterator of Decompressor.
+type DecompressIterator struct {
 	t   uint32
 	v   float64
 	err error
 	d   *Decompressor
 }
 
-// Get returns decompressed time-series data.
-func (d *DecompressorIter) Get() (t uint32, v float64) {
-	return d.t, d.v
+// Next returns decompressed time-series data.
+func (di *DecompressIterator) Next() (t uint32, v float64) {
+	return di.t, di.v
 }
 
 // Err returns error during decompression.
-func (d *DecompressorIter) Err() error {
-	if errors.Is(d.err, io.EOF) {
+func (di *DecompressIterator) Err() error {
+	if errors.Is(di.err, io.EOF) {
 		return nil
 	}
-	return d.err
+	return di.err
 }
 
-// Next proceeds decompressing time-series data unitil EOF.
-func (d *DecompressorIter) Next() bool {
-	if d.d.t == 0 {
-		d.t, d.v, d.err = d.d.decompressFirst()
+// HasNext proceeds decompressing time-series data unitil EOF.
+func (di *DecompressIterator) HasNext() bool {
+	if di.d.t == 0 {
+		di.t, di.v, di.err = di.d.decompressFirst()
 	} else {
-		d.t, d.v, d.err = d.d.decompress()
+		di.t, di.v, di.err = di.d.decompress()
 	}
-	return d.err == nil
+	return di.err == nil
 }
 
 func (d *Decompressor) decompressFirst() (t uint32, v float64, err error) {
