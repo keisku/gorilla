@@ -14,9 +14,9 @@ const (
 // Link to the paper: https://www.vldb.org/pvldb/vol8/p1816-teller.pdf
 type Compressor struct {
 	bw            *bitWriter
-	header        uint32
-	t             uint32
-	tDelta        uint32
+	header        int32
+	t             int32
+	tDelta        int32
 	leadingZeros  uint8
 	trailingZeros uint8
 	value         uint64
@@ -26,7 +26,7 @@ type Compressor struct {
 // at the end of compressing.
 func NewCompressor(w io.Writer, header uint32) (c *Compressor, finish func() error, err error) {
 	c = &Compressor{
-		header:       header,
+		header:       int32(header),
 		bw:           newBitWriter(w),
 		leadingZeros: math.MaxUint8,
 	}
@@ -40,8 +40,14 @@ func NewCompressor(w io.Writer, header uint32) (c *Compressor, finish func() err
 func (c *Compressor) Compress(t uint32, v float64) error {
 	// First time to compress.
 	if c.t == 0 {
-		delta := t - c.header
-		c.t = t
+		if int32(t)-c.header < 0 {
+			// Prevent overflowing of uint64(delta).
+			// TODO: Consider the better way to handle the case that
+			// `t` is smaller than `c.header`.
+			t = uint32(c.header)
+		}
+		delta := int32(t) - c.header
+		c.t = int32(t)
 		c.tDelta = delta
 		c.value = math.Float64bits(v)
 
@@ -68,11 +74,9 @@ func (c *Compressor) compress(t uint32, v float64) error {
 }
 
 func (c *Compressor) compressTimestamp(t uint32) error {
-	// If t < c.t, delta is overflowed because it is uint32.
-	// And it causes unexpected EOF during decoding.
-	delta := t - c.t
+	delta := int32(t) - c.t
 	dod := int64(delta) - int64(c.tDelta) // delta of delta
-	c.t = t
+	c.t = int32(t)
 	c.tDelta = delta
 
 	// | DoD         | Header bits | Value bits | Total bits |

@@ -20,11 +20,16 @@ func Test_Compress_Decompress(t *testing.T) {
 	header := uint32(time.Now().Unix())
 
 	const dataLen = 50000
-	valueFuzz := fuzz.New().NilChance(0)
 	expected := make([]data, dataLen)
+	valueFuzz := fuzz.New().NilChance(0)
 	ts := header
+	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < dataLen; i++ {
-		ts += uint32(rand.Int31n(10000))
+		if 0 < i && i%10 == 0 {
+			ts -= uint32(rand.Intn(100))
+		} else {
+			ts += uint32(rand.Int31n(100))
+		}
 		var v float64
 		valueFuzz.Fuzz(&v)
 		expected[i] = data{ts, v}
