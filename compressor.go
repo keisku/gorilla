@@ -41,9 +41,10 @@ func (c *Compressor) Compress(t uint32, v float64) error {
 	// First time to compress.
 	if c.t == 0 {
 		if int32(t)-c.header < 0 {
-			// Prevent overflowing of uint64(delta).
-			// TODO: Consider the better way to handle the case that
-			// `t` is smaller than `c.header`.
+			// Prevent overflowing of the delta of first timestamp but it updates
+			// `t` forcefully. So, it is not a good solution.
+			//
+			// TODO: Implement the better way to handle the case that `t` is smaller than `c.header`.
 			t = uint32(c.header)
 		}
 		delta := int32(t) - c.header
@@ -79,13 +80,13 @@ func (c *Compressor) compressTimestamp(t uint32) error {
 	c.t = int32(t)
 	c.tDelta = delta
 
-	// | DoD         | Header bits | Value bits | Total bits |
-	// |-------------|-------------|------------|------------|
-	// | 0           | 0           | 0          | 1          |
-	// | -63, 64     | 10          | 7          | 9          |
-	// | -255, 256   | 110         | 9          | 12         |
-	// | -2047, 2048 | 1110        | 12         | 16         |
-	// | > 2048      | 1111        | 32         | 36         |
+	// | DoD         | Header value | Value bits | Total bits |
+	// |-------------|------------- |------------|------------|
+	// | 0           | 0            | 0          | 1          |
+	// | -63, 64     | 10           | 7          | 9          |
+	// | -255, 256   | 110          | 9          | 12         |
+	// | -2047, 2048 | 1110         | 12         | 16         |
+	// | > 2048      | 1111         | 32         | 36         |
 	switch {
 	case dod == 0:
 		if err := c.bw.writeBit(zero); err != nil {
