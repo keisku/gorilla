@@ -166,17 +166,21 @@ func (d *Decompressor) dodTimestampBitN() (n uint, err error) {
 }
 
 func (d *Decompressor) decompressValue() (float64, error) {
-	bit, err := d.br.readBit()
-	if err != nil {
-		return 0, fmt.Errorf("failed to read value: %w", err)
-	}
-	if bit {
+	var read byte
+	for i := 0; i < 2; i++ {
 		bit, err := d.br.readBit()
 		if err != nil {
 			return 0, fmt.Errorf("failed to read value: %w", err)
 		}
 		if bit {
-			// New leading and trailing zeros
+			read <<= 1
+			read++
+		} else {
+			break
+		}
+	}
+	if read == 0x1 || read == 0x3 { // read byte is '1' or '11'
+		if read == 0x3 { // read byte is '11'
 			leadingZeros, err := d.br.readBits(5)
 			if err != nil {
 				return 0, fmt.Errorf("failed to read value: %w", err)
@@ -188,10 +192,10 @@ func (d *Decompressor) decompressValue() (float64, error) {
 			if significantBits == 0 {
 				significantBits = 64
 			}
-
 			d.leadingZeros = uint8(leadingZeros)
 			d.trailingZeros = 64 - uint8(significantBits) - d.leadingZeros
 		}
+		// read byte is '11' or '1'
 		valueBits, err := d.br.readBits(int(64 - d.leadingZeros - d.trailingZeros))
 		if err != nil {
 			return 0, fmt.Errorf("failed to read value: %w", err)
@@ -199,6 +203,5 @@ func (d *Decompressor) decompressValue() (float64, error) {
 		valueBits <<= uint64(d.trailingZeros)
 		d.value ^= valueBits
 	}
-
 	return math.Float64frombits(d.value), nil
 }
