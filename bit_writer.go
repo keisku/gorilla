@@ -8,7 +8,7 @@ import (
 type bitWriter struct {
 	w      io.Writer
 	buffer byte
-	count  uint8
+	count  uint8 // How many right-most bits are available for writing in the current byte (the last byte of the buffer).
 }
 
 // newBitWriter returns a writer that buffers bits and write the resulting bytes to 'w'
@@ -37,7 +37,7 @@ func (b *bitWriter) writeBit(bit bit) error {
 	return nil
 }
 
-// writeBits writes the nbits least significant bits of u64, most-significant-bit first.
+// writeBits writes the nbits right-most bits of u64 to the buffer in left-to-right order.
 func (b *bitWriter) writeBits(u64 uint64, nbits int) error {
 	u64 <<= (64 - uint(nbits))
 	for nbits >= 8 {
@@ -64,7 +64,7 @@ func (b *bitWriter) writeBits(u64 uint64, nbits int) error {
 
 // writeByte writes a single byte to the stream, regardless of alignment
 func (b *bitWriter) writeByte(byt byte) error {
-	// fill up b.buffer with b.count bits from byt
+	// Complete the last byte with the leftmost b.buffer bits from byt.
 	b.buffer |= byt >> (8 - b.count)
 
 	if _, err := b.w.Write([]byte{b.buffer}); err != nil {

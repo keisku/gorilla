@@ -10,7 +10,7 @@ import (
 type bitReader struct {
 	r      io.Reader
 	buffer [1]byte
-	count  uint8
+	count  uint8 // The number of right-most bits valid to read (from left) in the current 8 byte buffer.
 }
 
 // newReader returns a reader that returns a single bit at a time from 'r'
@@ -42,7 +42,8 @@ func (b *bitReader) readBit() (bit, error) {
 	return d != 0, nil
 }
 
-// readByte reads a single byte from the stream, regardless of alignment
+// readBits constructs a uint64 with the nbits right-most bits
+// read from the stream, and any other bits 0.
 func (b *bitReader) readByte() (byte, error) {
 	if b.count == 0 {
 		n, err := b.r.Read(b.buffer[:])
