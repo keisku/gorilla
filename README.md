@@ -1,5 +1,9 @@
 # Gorilla
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/kei6u/gorilla.svg)](https://pkg.go.dev/github.com/kei6u/gorilla)
+[![.github/workflows/test.yaml](https://github.com/kei6u/gorilla/actions/workflows/test.yaml/badge.svg)](https://github.com/kei6u/gorilla/actions/workflows/test.yaml)
+
+
 An effective time-series data compression method based on Facebook's Gorilla.
 It uses delta-of-delta timestamps and XOR'd floating-points values to reduce the data size.
 This is because most data points arrived at a fixed interval and the value in most time-series does not change significantly.
