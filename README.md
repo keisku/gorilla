@@ -1,7 +1,7 @@
 # Gorilla
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/kei6u/gorilla.svg)](https://pkg.go.dev/github.com/kei6u/gorilla)
-[![.github/workflows/test.yaml](https://github.com/kei6u/gorilla/actions/workflows/test.yaml/badge.svg)](https://github.com/kei6u/gorilla/actions/workflows/test.yaml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/keisku/gorilla.svg)](https://pkg.go.dev/github.com/keisku/gorilla)
+[![.github/workflows/test.yaml](https://github.com/keisku/gorilla/actions/workflows/test.yaml/badge.svg)](https://github.com/keisku/gorilla/actions/workflows/test.yaml)
 
 
 An effective time-series data compression method based on Facebook's Gorilla.
@@ -38,7 +38,7 @@ A two-hour block allows us to achieve a compression ratio of 1.37 bytes per data
 ### Installing
 
 ```shell
-go get github.com/kei6u/gorilla
+go get github.com/keisku/gorilla
 ```
 
 ### Compressor
