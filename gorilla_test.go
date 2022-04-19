@@ -51,8 +51,8 @@ func Test_Compress_Decompress(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, header, h)
 	iter := d.Iterator()
-	for iter.HasNext() {
-		t, v := iter.Next()
+	for iter.Next() {
+		t, v := iter.At()
 		actual = append(actual, data{t, v})
 	}
 	require.Nil(t, iter.Err())

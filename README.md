@@ -79,8 +79,8 @@ if err != nil {
 fmt.Printf("header: %v\n", h)
 
 iter := d.Iterator()
-for iter.HasNext() {
-    t, v := iter.Next()
+for iter.Next() {
+    t, v := iter.At()
     fmt.Println(t, v)
 }
 

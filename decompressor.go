@@ -45,8 +45,8 @@ type DecompressIterator struct {
 	d   *Decompressor
 }
 
-// Next returns decompressed time-series data.
-func (di *DecompressIterator) Next() (t uint32, v float64) {
+// At returns decompressed time-series data.
+func (di *DecompressIterator) At() (t uint32, v float64) {
 	return di.t, di.v
 }
 
@@ -58,8 +58,8 @@ func (di *DecompressIterator) Err() error {
 	return di.err
 }
 
-// HasNext proceeds decompressing time-series data unitil EOF.
-func (di *DecompressIterator) HasNext() bool {
+// Next proceeds decompressing time-series data unitil EOF.
+func (di *DecompressIterator) Next() bool {
 	if di.d.t == 0 {
 		di.t, di.v, di.err = di.d.decompressFirst()
 	} else {
