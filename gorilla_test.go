@@ -7,7 +7,7 @@ import (
 	"time"
 
 	fuzz "github.com/google/gofuzz"
-	"github.com/kei6u/gorilla"
+	"github.com/keisku/gorilla"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

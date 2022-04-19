@@ -1,4 +1,4 @@
-module github.com/kei6u/gorilla
+module github.com/keisku/gorilla
 
 go 1.17
 
